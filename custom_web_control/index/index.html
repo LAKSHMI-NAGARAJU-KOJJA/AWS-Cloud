@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Reflector Control</title>
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 500px;
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            color: #4b5563;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .form-group input[type="text"]:focus,
+        .form-group input[type="number"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4f46e5;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #4f46e5;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .button {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            border: none;
+            width: 100%;
+        }
+        .button:hover {
+            background-color: #4338ca;
+        }
+        #response {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background-color: #e0e7ff;
+            border: 1px solid #a5b4fc;
+            color: #374151;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #4f46e5;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Solar Reflector Control</h1>
+
+        <div class="mb-4 form-group">
+            <label for="apiEndpoint" class="block text-sm font-medium text-gray-700">API Gateway Endpoint URL:</label>
+            <input type="text" id="apiEndpoint" value="https://axjd117usj.execute-api.ap-south-1.amazonaws.com/dev/mydevice" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            <p class="mt-1 text-xs text-gray-500">This should be your actual API Gateway endpoint for the /mydevice resource. Ensure your API Gateway is deployed and accessible.</p>
+        </div>
+
+        <form id="controlForm" class="space-y-4">
+            <div class="form-group">
+                <label for="deviceId">Device ID:</label>
+                <input type="text" id="deviceId" value="esp001" required class="mt-1">
+            </div>
+
+            <div class="form-group flex items-center justify-between">
+                <label for="ledState" class="mb-0">LED State:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="ledState">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="operationMode">Operation Mode:</label>
+                <select id="operationMode" class="mt-1">
+                    <option value="auto">Automatic</option>
+                    <option value="manual">Manual</option>
+                    <option value="sleep">Sleep</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="targetAngle">Target Angle (0-180):</label>
+                <input type="number" id="targetAngle" value="90" min="0" max="180" class="mt-1">
+            </div>
+
+            <div class="form-group">
+                <label for="lightThreshold">Light Threshold (0-1023):</label>
+                <input type="number" id="lightThreshold" value="500" min="0" max="1023" class="mt-1">
+            </div>
+
+            <button type="submit" class="button">
+                Send Configuration
+                <span id="loadingSpinner" class="loading-spinner hidden"></span>
+            </button>
+        </form>
+
+        <div id="response" class="hidden">
+            <h3 class="font-semibold text-gray-700 mb-2">API Response:</h3>
+            <pre id="responseText"></pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('controlForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const apiEndpoint = document.getElementById('apiEndpoint').value;
+            const deviceId = document.getElementById('deviceId').value;
+            const ledState = document.getElementById('ledState').checked;
+            const operationMode = document.getElementById('operationMode').value;
+            const targetAngle = parseInt(document.getElementById('targetAngle').value, 10);
+            const lightThreshold = parseInt(document.getElementById('lightThreshold').value, 10);
+
+            // Basic validation
+            if (!deviceId) {
+                // Using a custom message box instead of alert()
+                showMessageBox('Device ID is required.', 'error');
+                return;
+            }
+            if (isNaN(targetAngle) || targetAngle < 0 || targetAngle > 180) {
+                showMessageBox('Target Angle must be between 0 and 180.', 'error');
+                return;
+            }
+            if (isNaN(lightThreshold) || lightThreshold < 0 || lightThreshold > 1023) {
+                showMessageBox('Light Threshold must be between 0 and 1023.', 'error');
+                return;
+            }
+
+            const payload = {
+                deviceId: deviceId,
+                ledState: ledState,
+                operationMode: operationMode,
+                targetAngle: targetAngle,
+                lightThreshold: lightThreshold
+            };
+
+            const responseDiv = document.getElementById('response');
+            const responseTextPre = document.getElementById('responseText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+
+            responseDiv.classList.add('hidden');
+            responseTextPre.textContent = '';
+            loadingSpinner.classList.remove('hidden'); // Show spinner
+
+            // --- IMPORTANT DEBUGGING STEP ---
+            console.log('--- Attempting to send POST request ---');
+            console.log('API Endpoint URL being used:', apiEndpoint); // VERY IMPORTANT: Check this URL in your browser's console
+            console.log('Payload being sent:', JSON.stringify(payload, null, 2));
+            console.log('-------------------------------------');
+
+            try {
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                // Check if the response was OK (status code 200-299)
+                if (!response.ok) {
+                    let errorDetails = '';
+                    try {
+                        // Try to parse JSON from the error response body
+                        const errorData = await response.json();
+                        errorDetails = JSON.stringify(errorData, null, 2);
+                    } catch (e) {
+                        // If JSON parsing fails, just use the raw status
+                        errorDetails = `Could not parse error response as JSON. Raw status: ${response.status} ${response.statusText}`;
+                    }
+                    const errorMessage = `HTTP Error: ${response.status} ${response.statusText}. Details: ${errorDetails}`;
+                    console.error('API Response Error:', errorMessage);
+                    responseDiv.classList.remove('hidden');
+                    responseTextPre.textContent = errorMessage;
+                    responseDiv.style.backgroundColor = '#fee2e2'; // Red background for error
+                    responseDiv.style.borderColor = '#ef4444';
+                    return; // Stop execution if response is not OK
+                }
+
+                const data = await response.json();
+
+                responseDiv.classList.remove('hidden');
+                responseTextPre.textContent = JSON.stringify(data, null, 2);
+                responseDiv.style.backgroundColor = '#e0e7ff'; // Blue background for success
+                responseDiv.style.borderColor = '#a5b4fc';
+
+            } catch (error) {
+                responseDiv.classList.remove('hidden');
+                let userGuidance = '';
+                if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                    userGuidance = 'This typically means the browser could not establish a connection to the server. Please check:\n\n1.  **API Gateway URL:** Ensure the URL in the "API Gateway Endpoint URL" field is *exactly* correct and matches your deployed API Gateway endpoint (including `/dev/mydevice`). Copy the URL logged in the console (above) and paste it directly into your browser or a tool like Postman to verify it\'s reachable.\n2.  **API Gateway Deployment:** Confirm your API Gateway is deployed to the `dev` stage and the `mydevice` resource has GET/POST methods configured with Lambda Proxy Integration.\n3.  **Local Web Server:** If you\'re opening `index.html` directly from your file system (`file://`), try serving it with a local web server (e.g., `python -m http.server 8000`) and accessing it via `http://localhost:8000/index.html`. Browsers often block `fetch` requests from `file://` URLs due to security.\n4.  **Internet Connection:** Verify your internet connection is stable.\n5.  **CORS Configuration:** Double-check that CORS is enabled for the `/mydevice` resource in API Gateway.';
+                } else {
+                    userGuidance = `An unexpected JavaScript error occurred: ${error.message}`;
+                }
+                responseTextPre.textContent = `Failed to send request. ${userGuidance}`;
+                responseDiv.style.backgroundColor = '#fee2e2'; // Red background for error
+                responseDiv.style.borderColor = '#ef4444';
+                console.error('Fetch Error (Catch Block):', error);
+            } finally {
+                loadingSpinner.classList.add('hidden'); // Hide spinner
+            }
+        });
+
+        // Custom message box function
+        function showMessageBox(message, type = 'info') {
+            let messageBox = document.getElementById('customMessageBox');
+            if (!messageBox) {
+                messageBox = document.createElement('div');
+                messageBox.id = 'customMessageBox';
+                messageBox.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    padding: 15px 25px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    z-index: 1000;
+                    font-family: 'Inter', sans-serif;
+                    font-size: 1rem;
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease-in-out;
+                `;
+                document.body.appendChild(messageBox);
+            }
+
+            messageBox.textContent = message;
+            if (type === 'error') {
+                messageBox.style.backgroundColor = '#ef4444'; // Red
+            } else if (type === 'success') {
+                messageBox.style.backgroundColor = '#22c55e'; // Green
+            } else {
+                messageBox.style.backgroundColor = '#3b82f6'; // Blue (info)
+            }
+
+            messageBox.style.opacity = 1;
+
+            setTimeout(() => {
+                messageBox.style.opacity = 0;
+            }, 3000); // Hide after 3 seconds
+        }
+    </script>
+</body>
+</html>
